@@ -15,3 +15,6 @@ git clone "$repo_url" "$target_path" --config filter.lfs.smudge= --config filter
 cd "$target_path"
 
 echo "Repository prepared at $target_path"
+
+# Install guard to prevent accidental LFS usage
+"$(dirname "$0")"/install-lfs-guard.sh "$target_path"
