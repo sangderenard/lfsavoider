@@ -14,7 +14,9 @@ if (Test-Path $CleanPath) { Remove-Item -Recurse -Force $CleanPath }
 Copy-Item -Recurse -Force $RepoPath $CleanPath
 
 Set-Location $CleanPath
-git lfs install
+# Ensure Git operates without LFS filters
+git config --local filter.lfs.smudge ""
+git config --local filter.lfs.required false
 
 # Emergency manual hold
 Write-Host "`nEMERGENCY MODE: Review the repo state before overwriting remote."
