@@ -30,3 +30,7 @@ The following Bash scripts mirror the PowerShell ones:
 - `coordinate-repo-cleaning.sh` – orchestrate all steps
 
 Check each script for usage details. The repository intentionally omits persistent archives; after running, push the sanitized repo to a new remote and store binary artifacts in GCS.
+
+## PowerShell utilities
+
+- `check-lfs-integrity.ps1` – verify that all LFS objects referenced in the repository exist on the server
