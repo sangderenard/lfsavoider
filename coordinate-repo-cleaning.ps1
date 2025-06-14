@@ -8,17 +8,14 @@ param (
     [ValidateNotNullOrEmpty()]
     [string[]]$RepoURLs,  # List of repository URLs
 
-    [string[]]$AdditionalFolders = @(),  # Additional folders to copy or excise
-
-    [string]$AdditionalFolderDestination = "",  # Destination for additional folders
-
-    [string]$QuarantinePath = "",  # Path for quarantined LFS data
-
     [switch]$New,  # Replace old folders if the process completes successfully
 
     [switch]$UploadLFS  # Upload quarantined LFS files to GCS
 )
 
+# Load project-specific configuration
+Import-Module (Join-Path $PSScriptRoot 'lfsavoider.config.ps1')
+  
 foreach ($repoURL in $RepoURLs) {
     if (-not $repoURL) {
         if (-not $RepoName) {
@@ -38,8 +35,9 @@ foreach ($repoURL in $RepoURLs) {
     $BasePath = Join-Path $RepoFolder $RepoName
     $TempPath = "$BasePath-temp"
     $CleanPath = "$BasePath-clean"
-    $QuarantinePath = if ($QuarantinePath) { $QuarantinePath } else { "$BasePath-quarantined-lfs" }
-    $AdditionalCapturePath = if ($AdditionalFolderDestination) { $AdditionalFolderDestination } else { "$BasePath-additional-capture" }
+    # Define paths for quarantine and additional capture
+    $QuarantinePath = "$BasePath-quarantined-lfs"
+    $AdditionalCapturePath = "$BasePath-additional-capture"
     $BackupGitPath = "$BasePath-backup-git"
 
     if (-not (Test-Path $BasePath)) {
@@ -57,11 +55,11 @@ foreach ($repoURL in $RepoURLs) {
 
     # Step 2: Quarantine LFS data and additional folders
     Write-Host "Quarantining LFS data and additional folders for: $RepoName"
-    .\quarantine-lfs-data.ps1 -TargetFolders @("AGENTS\proposals\wheelhouse_repo") + $AdditionalFolders -AdditionalFolderDestination $AdditionalCapturePath -QuarantinePath $QuarantinePath
+    .\quarantine-lfs-data.ps1 -QuarantinePath $QuarantinePath -AdditionalFolderDestination $AdditionalCapturePath -TargetFolders $TargetFolders
 
     # Step 3: Purge LFS history
     Write-Host "Purging LFS history for: $RepoName"
-    .\purge-lfs-history.ps1 -RepoPath $TempPath -PathsToPurge @("AGENTS/proposals/wheelhouse_repo")
+    .\purge-lfs-history.ps1 -RepoPath $TempPath -PathsToPurge $PathsToPurge
 
     # Step 4: Reinstall clean repository
     Write-Host "Reinstalling clean repository for: $RepoName"
@@ -81,7 +79,7 @@ foreach ($repoURL in $RepoURLs) {
     # Step 7: Upload quarantined LFS files to GCS if -UploadLFS is specified
     if ($UploadLFS -and (Test-Path $QuarantinePath)) {
         Write-Host "Uploading quarantined LFS files to GCS for: $RepoName"
-        .\upload-lfs-to-gcs.ps1 -QuarantinePath $QuarantinePath -GCSBucket "gs://your-lfs-bucket" -GCloudKeyPath "gcs-keys/service-account.json"
+        .\upload-lfs-to-gcs.ps1 -QuarantinePath $QuarantinePath -GCSBucket $GCSBucket -GCloudKeyPath $GCSKeyPath
     }
 
     Write-Host "Process completed for: $RepoName"

@@ -6,6 +6,15 @@ This project provides tools to permanently remove Git LFS usage from a repositor
 
 PowerShell scripts originally orchestrate the process. This repository now includes a Bash suite that mirrors those scripts. Use whichever toolchain fits your environment but ensure Git LFS is disabled at all times.
 
+## Configuration
+
+All bash orchestrations load `lfsavoider.config.sh` for project-specific settings. Customize the following variables in that file:
+
+- `WHEELHOUSE_SRC` (optional): path to a local wheelhouse directory.
+- `TARGET_FOLDERS` (optional): array of folder paths (relative to repo root) to quarantine.
+- `PATHS_TO_PURGE` (optional): array of paths (relative to repo root) to remove from commit history.
+- `GCS_BUCKET` and `GCS_KEY_PATH` (optional): Google Cloud Storage settings for uploading artifacts.
+
 ### Security and Configuration
 
 - GCS credentials and other sensitive configuration **must** come from secret storage. Do not store them in this repository.
@@ -18,7 +27,7 @@ These scripts expect to work on fresh clones or disposable copies of a repositor
 
 ## Bash scripts
 
-The following Bash scripts mirror the PowerShell ones:
+The following Bash scripts mirror the PowerShell ones and automatically source `lfsavoider.config.sh`:
 
 - `prepare-speaktome.sh` – clone a repo with LFS disabled
 - `quarantine-lfs-data.sh` – copy target folders and separate any LFS tracked files

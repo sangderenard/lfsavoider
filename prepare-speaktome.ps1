@@ -18,3 +18,5 @@ Set-Location $TargetPath
 
 Write-Host "Repository prepared at $TargetPath"
 & "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $TargetPath
+
+# Wheelhouse copying is now controlled via `lfsavoider.config.ps1`

@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_url="$1"
 target_path="$2"
+source "$(dirname "$0")/lfsavoider.config.sh"
 
 if [ -d "$target_path" ]; then
   rm -rf "$target_path"
