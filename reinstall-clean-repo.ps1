@@ -8,12 +8,24 @@ param (
     [ValidateNotNullOrEmpty()]
     [string]$RemoteURL,  # Remote URL for the repository
 
+
     [switch]$WhatIf
 )
 
 # Clean destination if exists
-if (Test-Path $CleanPath) { Remove-Item -Recurse -Force -WhatIf:$WhatIf $CleanPath }
-Copy-Item -Recurse -Force -WhatIf:$WhatIf $RepoPath $CleanPath
+
+if (Test-Path $CleanPath) {
+    if ($WhatIf) {
+        Write-Host "[WhatIf] Would remove $CleanPath" -ForegroundColor Yellow
+    } else {
+        Remove-Item -Recurse -Force $CleanPath
+    }
+}
+if ($WhatIf) {
+    Write-Host "[WhatIf] Would copy $RepoPath to $CleanPath" -ForegroundColor Yellow
+} else {
+    Copy-Item -Recurse -Force $RepoPath $CleanPath
+}
 
 Set-Location $CleanPath
 # Ensure Git operates without LFS filters
