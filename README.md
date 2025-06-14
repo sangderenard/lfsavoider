@@ -34,3 +34,7 @@ Check each script for usage details. The repository intentionally omits persiste
 ## PowerShell utilities
 
 - `check-lfs-integrity.ps1` – verify that all LFS objects referenced in the repository exist on the server
+
+## LFS Guard
+
+All scripts now place a `.lfs.guard` file and a pre-commit hook into generated repositories and manifest folders. The guard includes a SHA-256 hash of the current manifest so clones can verify integrity and will block any attempt to commit Git LFS objects.
