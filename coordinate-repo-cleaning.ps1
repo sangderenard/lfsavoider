@@ -10,7 +10,9 @@ param (
 
     [switch]$New,  # Replace old folders if the process completes successfully
 
-    [switch]$UploadLFS  # Upload quarantined LFS files to GCS
+    [switch]$UploadLFS,  # Upload quarantined LFS files to GCS
+
+    [switch]$WhatIf     # If specified, show actions without executing
 )
 
 # Load project-specific configuration
@@ -63,17 +65,17 @@ foreach ($repoURL in $RepoURLs) {
 
     # Step 4: Reinstall clean repository
     Write-Host "Reinstalling clean repository for: $RepoName"
-    .\reinstall-clean-repo.ps1 -repoPath $TempPath -cleanPath $CleanPath
+    .\reinstall-clean-repo.ps1 -repoPath $TempPath -cleanPath $CleanPath -RemoteURL $repoURL -WhatIf:$WhatIf
 
     # Step 5: Restore Git metadata (optional)
     Write-Host "Restoring Git metadata for: $RepoName"
-    .\restore-git-metadata.ps1 -repoPath $CleanPath
+    .\restore-git-metadata.ps1 -repoPath $CleanPath -WhatIf:$WhatIf
 
     # Step 6: Replace old folder if -New is specified
     if ($New) {
         Write-Host "Replacing old folder with new clean repository for: $RepoName"
-        if (Test-Path $BasePath) { Remove-Item -Recurse -Force $basePath }
-        Rename-Item -Path $cleanPath -NewName $basePath
+        if (Test-Path $BasePath) { Remove-Item -Recurse -Force -WhatIf:$WhatIf $basePath }
+        Rename-Item -Path $cleanPath -NewName $basePath -WhatIf:$WhatIf
     }
 
     # Step 7: Upload quarantined LFS files to GCS if -UploadLFS is specified

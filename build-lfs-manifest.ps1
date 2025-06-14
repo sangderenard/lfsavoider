@@ -26,11 +26,16 @@ $TemplatePath    = Join-Path $BasePath "template\feed.html"  # Optional
 $ManifestYaml    = Join-Path $ManifestPath "lfs_manifest.yaml"
 $ManifestMD      = Join-Path $ManifestPath "lfs_manifest.md"
 $ManifestHTML    = Join-Path $ManifestPath "index.html"
+$LogFile         = Join-Path $ManifestPath "manifest.log"
+
+if (-not (Test-Path $LogFile)) { New-Item -ItemType File -Path $LogFile | Out-Null }
+"$(Get-Date -Format s) Starting manifest generation" | Add-Content -Path $LogFile
 
 # === Ensure directories exist ===
 @($QuarantinePath, $ManifestPath) | ForEach-Object {
     if (-not (Test-Path $_)) { New-Item -ItemType Directory -Path $_ | Out-Null }
 }
+"$(Get-Date -Format s) Directories ensured" | Add-Content -Path $LogFile
 
 # === Scan quarantined LFS files ===
 $Files = Get-ChildItem -Recurse -Path $QuarantinePath | Where-Object { -not $_.PSIsContainer }
@@ -53,6 +58,7 @@ foreach ($file in $Files) {
 }
 
 $YamlData | ConvertTo-Yaml | Set-Content -Path $ManifestYaml
+"$(Get-Date -Format s) YAML manifest saved to $ManifestYaml" | Add-Content -Path $LogFile
 
 # === Generate Markdown ===
 $Markdown = @(
@@ -65,6 +71,7 @@ $Markdown += $Files | ForEach-Object {
     "| `$_` | $($_.Length) | $($_.LastWriteTime.ToString('u')) |"
 }
 $Markdown -join "`n" | Set-Content -Path $ManifestMD
+"$(Get-Date -Format s) Markdown manifest saved to $ManifestMD" | Add-Content -Path $LogFile
 
 # === Optional: Generate HTML ===
 if (Test-Path $TemplatePath) {
@@ -74,9 +81,12 @@ if (Test-Path $TemplatePath) {
     } | Out-String
     $HtmlFinal = $HtmlTemplate -replace "{{file_rows}}", $FileRows
     $HtmlFinal | Set-Content -Path $ManifestHTML
+    "$(Get-Date -Format s) HTML manifest saved to $ManifestHTML" | Add-Content -Path $LogFile
 } else {
     Write-Warning "No HTML template found at $TemplatePath"
+    "$(Get-Date -Format s) No HTML template found" | Add-Content -Path $LogFile
 }
 
 Write-Host "Manifest files generated for $RepoName in $ManifestPath"
+"$(Get-Date -Format s) Manifest generation complete" | Add-Content -Path $LogFile
 & "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $ManifestPath -ManifestYaml $ManifestYaml
