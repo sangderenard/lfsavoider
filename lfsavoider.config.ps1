@@ -20,5 +20,6 @@
 $WheelhouseSrc = ''
 $TargetFolders = @()
 $PathsToPurge = @()
+$RepoCollectionRoot = 'C:\\Apache24\\htdocs\\AI\\local-lfs-archives'
 $GCSBucket = ''
 $GCSKeyPath = ''

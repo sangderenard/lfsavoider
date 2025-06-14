@@ -1,20 +1,18 @@
 param (
-    [ValidateNotNullOrEmpty()]
-    [string]$QuarantinePath,  # Path for quarantined LFS data
-
-    [ValidateNotNullOrEmpty()]
-    [string]$AdditionalFolderDestination,  # Destination for additional folders
-
-    [ValidateNotNullOrEmpty()]
-    [string[]]$TargetFolders  # List of target folders to quarantine
+    [Parameter(Mandatory)][string]$QuarantinePath,
+    [Parameter(Mandatory)][string]$AdditionalFolderDestination,
+    [Parameter(Mandatory)][string[]]$TargetFolders,
+    [switch]$WhatIf
 )
 
-if (!(Test-Path $QuarantinePath)) {
-    New-Item -ItemType Directory -Path $QuarantinePath
+. "$PSScriptRoot/helpers.ps1"
+
+if (-not (Test-Path $QuarantinePath)) {
+    New-Item -ItemType Directory -Path $QuarantinePath | Out-Null
 }
 
-if (!(Test-Path $AdditionalFolderDestination)) {
-    New-Item -ItemType Directory -Path $AdditionalFolderDestination
+if (-not (Test-Path $AdditionalFolderDestination)) {
+    New-Item -ItemType Directory -Path $AdditionalFolderDestination | Out-Null
 }
 
 # Detect LFS-tracked files using .gitattributes
@@ -25,22 +23,35 @@ $LfsPatterns = if (Test-Path $GitattributesPath) {
     @()
 }
 
+$checksumList = @()
 foreach ($folder in $TargetFolders) {
     $SourcePath = Join-Path $PWD $folder
-    $DestPath = Join-Path $QuarantinePath (Split-Path $folder -Leaf)
-
-    if (Test-Path $SourcePath) {
-        Write-Host "Quarantining $SourcePath to $DestPath"
-        Copy-Item -Recurse -Force $SourcePath $DestPath
-
-        # Move non-LFS files to the additional folder
-        Get-ChildItem -Path $DestPath -Recurse | Where-Object {
-            $LfsPatterns -notcontains $_.Name
-        } | ForEach-Object {
-            $AdditionalDest = Join-Path $AdditionalFolderDestination $_.Name
-            Move-Item -Path $_.FullName -Destination $AdditionalDest -Force
-        }
-    } else {
+    if (-not (Test-Path $SourcePath)) {
         Write-Warning "$SourcePath does not exist!"
+        continue
     }
+
+    Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {
+        $relative = $_.FullName.Substring($SourcePath.Length).TrimStart('\\','/')
+        $dest = Join-Path $QuarantinePath $folder $relative
+        $destDir = Split-Path $dest -Parent
+        if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+        Invoke-CheckedCommand -WhatIf:$WhatIf -Command { Copy-Item -Path $_.FullName -Destination $dest -Force }
+
+        if ($LfsPatterns -notcontains $_.Name) {
+            $addDest = Join-Path $AdditionalFolderDestination $folder $relative
+            $addDir = Split-Path $addDest -Parent
+            if (-not (Test-Path $addDir)) { New-Item -ItemType Directory -Path $addDir -Force | Out-Null }
+            Invoke-CheckedCommand -WhatIf:$WhatIf -Command { Move-Item -Path $dest -Destination $addDest -Force }
+        }
+
+        if (-not $WhatIf) {
+            $hash = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash
+            $checksumList += "$($folder)/$relative $hash"
+        }
+    }
+}
+
+if (-not $WhatIf -and $checksumList.Count -gt 0) {
+    $checksumList | Set-Content -Path (Join-Path $QuarantinePath 'checksums.txt')
 }

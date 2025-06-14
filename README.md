@@ -13,7 +13,10 @@ All bash orchestrations load `lfsavoider.config.sh` for project-specific setting
 - `WHEELHOUSE_SRC` (optional): path to a local wheelhouse directory.
 - `TARGET_FOLDERS` (optional): array of folder paths (relative to repo root) to quarantine.
 - `PATHS_TO_PURGE` (optional): array of paths (relative to repo root) to remove from commit history.
+- `REPO_COLLECTION_ROOT` (optional): directory where cleaned repositories and manifests are stored.
 - `GCS_BUCKET` and `GCS_KEY_PATH` (optional): Google Cloud Storage settings for uploading artifacts.
+
+PowerShell scripts read the same values from `lfsavoider.config.ps1`.
 
 ### Security and Configuration
 

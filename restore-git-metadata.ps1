@@ -1,18 +1,17 @@
-$repoPath = "C:\Apache24\htdocs\AI\speaktome-clean"
-$backupGit = "C:\Apache24\htdocs\AI\speaktome-backup-git\.git"
 
-[CmdletBinding(SupportsShouldProcess=$true)]
 param(
+    [Parameter(Mandatory)][string]$RepoPath,
+    [Parameter(Mandatory)][string]$BackupGit,
     [switch]$WhatIf
 )
 
-if (Test-Path $backupGit) {
+. "$PSScriptRoot/helpers.ps1"
+
+if (Test-Path $BackupGit) {
     Write-Host "Restoring original .git metadata..."
-    if ($PSCmdlet.ShouldProcess($repoPath, 'Replace .git with backup')) {
-        Remove-Item -Recurse -Force -WhatIf:$WhatIf (Join-Path $repoPath ".git")
-        Copy-Item -Recurse -Force -WhatIf:$WhatIf $backupGit (Join-Path $repoPath ".git")
-    }
+    Invoke-CheckedCommand -WhatIf:$WhatIf -Command { Remove-Item -Recurse -Force (Join-Path $RepoPath '.git') }
+    Invoke-CheckedCommand -WhatIf:$WhatIf -Command { Copy-Item -Recurse -Force $BackupGit (Join-Path $RepoPath '.git') }
     Write-Host ".git metadata restored."
 } else {
-    Write-Warning "No .git backup found at $backupGit"
+    Write-Warning "No .git backup found at $BackupGit"
 }
