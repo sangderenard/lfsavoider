@@ -1,5 +1,5 @@
 param (
-    [string]$RepoRoot = $PWD,
+    [string]$RepoCollectionRoot = "../"
     [string]$ConfigFile = "config/manifest.config.json",
     [switch]$WhatIf
 )
@@ -22,7 +22,8 @@ if (-not $Config.repo_name) {
 $RepoName = $Config.repo_name
 
 # === Build derived paths ===
-$BasePath        = Join-Path $RepoRoot $RepoName
+
+$BasePath        = Join-Path $RepoCollectionRoot $RepoName
 $QuarantinePath  = Join-Path $BasePath "$RepoName-quarantined-lfs"
 $ManifestPath    = Join-Path $BasePath "$RepoName-manifests"
 $TemplatePath    = Join-Path $BasePath "template/feed.html"  # Optional
