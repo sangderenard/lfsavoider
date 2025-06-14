@@ -1,41 +1,56 @@
 # LFS Avoider
 
-This project provides tools to permanently remove Git LFS usage from a repository. The goal is to quarantine any large binary content, purge all Git LFS metadata, rebuild a clean repository without the LFS hooks, and upload the large binaries to Google Cloud Storage (GCS) for archival. **Never enable Git LFS** in any workflow when using these scripts.
+A cross-platform toolkit for permanently removing Git LFS usage from a repository. Each script focuses on a single step: quarantine large binaries, purge history, rebuild without LFS hooks, and optionally archive artifacts to Google Cloud Storage (GCS). **Never re-enable Git LFS in repositories processed with these tools.**
 
 ## Overview
 
-PowerShell scripts originally orchestrate the process. This repository now includes a Bash suite that mirrors those scripts. Use whichever toolchain fits your environment but ensure Git LFS is disabled at all times.
+The repository contains both PowerShell and Bash implementations. Use whichever environment fits your needs. Scripts assume they are run in disposable clones, never directly on your primary repo.
 
-### Security and Configuration
+### Security
 
-- GCS credentials and other sensitive configuration **must** come from secret storage. Do not store them in this repository.
-- Processed archives should be uploaded to GCS and not committed back here.
-- If cross-repo access is required, store any authentication tokens in your runner's secrets.
+- Provide GCS credentials and any secrets through your CI runner or environment, not in this repository.
+- Upload quarantined archives to GCS and keep them out of version control.
 
 ### Safety
 
-These scripts expect to work on fresh clones or disposable copies of a repository. They are **not** intended for in-place cleaning of the repository that the agent is executing from. If a step would require deleting the runner's repository, abort the operation.
+Operations remove and replace directories. Work on fresh clones or throwaway copies only.
 
-## Bash scripts
+## Quick Start (Bash)
 
-The following Bash scripts mirror the PowerShell ones:
+```bash
+# 1. Clone the repo you want to clean with LFS disabled
+./prepare-speaktome.sh https://example.com/repo.git /tmp/repo-temp
 
-- `prepare-speaktome.sh` – clone a repo with LFS disabled
-- `quarantine-lfs-data.sh` – copy target folders and separate any LFS tracked files
-- `purge-lfs-history.sh` – remove paths from history using `git filter-repo`
-- `reinstall-clean-repo.sh` – push the cleaned repo to a fresh remote
-- `restore-git-metadata.sh` – restore `.git` metadata from backup if needed
-- `upload-lfs-to-gcs.sh` – upload quarantined binaries to GCS
-- `build-lfs-manifest.sh` – generate YAML and Markdown manifests for quarantined files
-- `coordinate-repo-cleaning.sh` – orchestrate all steps
+# 2. Quarantine LFS data and capture additional folders
+./quarantine-lfs-data.sh /tmp/repo-quarantine /tmp/repo-additional AGENTS/proposals/wheelhouse_repo
 
-Check each script for usage details. The repository intentionally omits persistent archives; after running, push the sanitized repo to a new remote and store binary artifacts in GCS.
+# 3. Purge those folders from history
+./purge-lfs-history.sh /tmp/repo-temp AGENTS/proposals/wheelhouse_repo
 
-## PowerShell utilities
+# 4. Reinstall the cleaned repo and force push
+./reinstall-clean-repo.sh /tmp/repo-temp /tmp/repo-clean https://example.com/repo.git
 
-- `check-lfs-integrity.ps1` – verify that all LFS objects referenced in the repository exist on the server
+# 5. Optionally upload quarantined binaries to GCS
+./upload-lfs-to-gcs.sh /tmp/repo-quarantine gs://your-lfs-bucket gcs-keys/service-account.json
+```
+
+PowerShell scripts provide the same functionality with similar parameters.
+
+## Script Reference
+
+| Script | Purpose | Usage Example |
+| ------ | ------- | ------------- |
+| `prepare-speaktome.(ps1|sh)` | Clone a repo with LFS disabled | `./prepare-speaktome.sh <repo_url> <target_path>` |
+| `quarantine-lfs-data.(ps1|sh)` | Copy target folders, separating files tracked by LFS | `./quarantine-lfs-data.sh <quarantine_path> <additional_dest> <folder> [...]` |
+| `purge-lfs-history.(ps1|sh)` | Remove paths from git history using `git filter-repo` | `./purge-lfs-history.sh <repo_path> <path> [...]` |
+| `reinstall-clean-repo.(ps1|sh)` | Push the cleaned repo to a fresh remote | `./reinstall-clean-repo.sh <repo_path> <clean_path> <remote_url>` |
+| `restore-git-metadata.(ps1|sh)` | Restore `.git` metadata from backup if needed | `./restore-git-metadata.sh <repo_path> <backup_git>` |
+| `upload-lfs-to-gcs.(ps1|sh)` | Upload quarantined binaries to GCS | `./upload-lfs-to-gcs.sh <quarantine_path> <bucket> <keyfile>` |
+| `build-lfs-manifest.(ps1|sh)` | Generate YAML/Markdown manifests of quarantined files | `./build-lfs-manifest.ps1` |
+| `coordinate-repo-cleaning.(ps1|sh)` | Orchestrate all steps above | `./coordinate-repo-cleaning.sh -r /repos -u https://example.com/repo.git` |
+| `check-lfs-integrity.ps1` | Verify that all LFS objects exist on the server | `pwsh ./check-lfs-integrity.ps1` |
 
 ## LFS Guard
 
-All scripts now place a `.lfs.guard` file and a pre-commit hook into generated repositories and manifest folders. The hook script used is provided as `pre-commit.lfs.guard` in this repository. The guard includes a SHA-256 hash of the current manifest so clones can verify integrity and will block any attempt to commit any form of Git LFS usage.
+Every script installs a `.lfs.guard` file and a `pre-commit` hook to prevent reintroducing Git LFS. The guard stores the SHA-256 hash of the latest manifest so clones can verify integrity.
 
