@@ -6,12 +6,14 @@ param (
     [string]$RepoPath,  # Path to the temporary repository
 
     [ValidateNotNullOrEmpty()]
-    [string]$RemoteURL  # Remote URL for the repository
+    [string]$RemoteURL,  # Remote URL for the repository
+
 
     [switch]$WhatIf
 )
 
 # Clean destination if exists
+
 if (Test-Path $CleanPath) {
     if ($WhatIf) {
         Write-Host "[WhatIf] Would remove $CleanPath" -ForegroundColor Yellow
@@ -34,18 +36,19 @@ git config --local filter.lfs.required false
 & "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $CleanPath
 
 # Emergency manual hold
+Write-Host "`nEMERGENCY MODE: Review the repo state before overwriting remote."
 if (-not $WhatIf) {
-    Write-Host "`nEMERGENCY MODE: Review the repo state before overwriting remote."
     Write-Host "Press Enter to continue with FORCE PUSH or Ctrl+C to cancel."
     Read-Host
 } else {
-    Write-Host "[WhatIf] Skipping interactive confirmation" -ForegroundColor Yellow
+    Write-Host "WhatIf mode enabled: skipping prompt and push"
 }
 
 # Force push to clean overwrite the repo (use carefully)
-git remote set-url origin $RemoteURL
-if ($WhatIf) {
-    Write-Host "[WhatIf] Would force push to $RemoteURL" -ForegroundColor Yellow
-} else {
+if (-not $WhatIf) {
+    git remote set-url origin $RemoteURL
     git push --force --set-upstream origin main
+} else {
+    Write-Host "WhatIf: git remote set-url origin $RemoteURL"
+    Write-Host "WhatIf: git push --force --set-upstream origin main"
 }
