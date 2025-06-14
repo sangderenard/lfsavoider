@@ -1,7 +1,10 @@
 param (
-    [string]$LocalRepoCollectionFolder = "C:\\Apache24\\htdocs\\AI\\local-lfs-archives",
-    [string]$ConfigFile = "config\\manifest.config.json"
+    [string]$RepoRoot = $PWD,
+    [string]$ConfigFile = "config/manifest.config.json",
+    [switch]$WhatIf
 )
+
+. "$PSScriptRoot/helpers.ps1"
 
 # === Load repo name from config ===
 if (-not (Test-Path $ConfigFile)) {
@@ -19,10 +22,10 @@ if (-not $Config.repo_name) {
 $RepoName = $Config.repo_name
 
 # === Build derived paths ===
-$BasePath        = Join-Path $LocalRepoCollectionFolder $RepoName
+$BasePath        = Join-Path $RepoRoot $RepoName
 $QuarantinePath  = Join-Path $BasePath "$RepoName-quarantined-lfs"
 $ManifestPath    = Join-Path $BasePath "$RepoName-manifests"
-$TemplatePath    = Join-Path $BasePath "template\feed.html"  # Optional
+$TemplatePath    = Join-Path $BasePath "template/feed.html"  # Optional
 $ManifestYaml    = Join-Path $ManifestPath "lfs_manifest.yaml"
 $ManifestMD      = Join-Path $ManifestPath "lfs_manifest.md"
 $ManifestHTML    = Join-Path $ManifestPath "index.html"
@@ -51,7 +54,7 @@ $YamlData = [ordered]@{
 foreach ($file in $Files) {
     $YamlData.files += [ordered]@{
         name     = $file.Name
-        path     = $file.FullName
+        path     = $file.FullName.Substring($QuarantinePath.Length).TrimStart('\\','/')
         size     = $file.Length
         modified = $file.LastWriteTime
     }
@@ -77,7 +80,8 @@ $Markdown -join "`n" | Set-Content -Path $ManifestMD
 if (Test-Path $TemplatePath) {
     $HtmlTemplate = Get-Content -Raw -Path $TemplatePath
     $FileRows = $Files | ForEach-Object {
-        "<tr><td>$($_.Name)</td><td>$($_.FullName)</td><td>$($_.Length)</td><td>$($_.LastWriteTime)</td></tr>"
+        $rel = $_.FullName.Substring($QuarantinePath.Length).TrimStart('\\','/')
+        "<tr><td>$($_.Name)</td><td>$rel</td><td>$($_.Length)</td><td>$($_.LastWriteTime)</td></tr>"
     } | Out-String
     $HtmlFinal = $HtmlTemplate -replace "{{file_rows}}", $FileRows
     $HtmlFinal | Set-Content -Path $ManifestHTML
@@ -89,4 +93,4 @@ if (Test-Path $TemplatePath) {
 
 Write-Host "Manifest files generated for $RepoName in $ManifestPath"
 "$(Get-Date -Format s) Manifest generation complete" | Add-Content -Path $LogFile
-& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $ManifestPath -ManifestYaml $ManifestYaml
+& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $ManifestPath -ManifestYaml $ManifestYaml -WhatIf:$WhatIf
