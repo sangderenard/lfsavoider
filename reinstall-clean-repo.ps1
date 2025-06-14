@@ -9,7 +9,8 @@ param (
     [string]$RemoteURL,  # Remote URL for the repository
 
 
-    [switch]$WhatIf
+    [switch]$WhatIf,
+    [switch]$AutoConfirm
 )
 
 # Clean destination if exists
@@ -27,6 +28,8 @@ if ($WhatIf) {
     Copy-Item -Recurse -Force $RepoPath $CleanPath
 }
 
+.\backup-repo.ps1 -RepoPath $CleanPath -RemoteURL $RemoteURL -WhatIf:$WhatIf
+
 Set-Location $CleanPath
 # Ensure Git operates without LFS filters
 git config --local filter.lfs.smudge ""
@@ -37,9 +40,9 @@ git config --local filter.lfs.required false
 
 # Emergency manual hold
 Write-Host "`nEMERGENCY MODE: Review the repo state before overwriting remote."
-if (-not $WhatIf) {
+if (-not $WhatIf -and -not $AutoConfirm) {
     Write-Host "Press Enter to continue with FORCE PUSH or Ctrl+C to cancel."
-    Read-Host
+    Read-Host | Out-Null
 } else {
     Write-Host "WhatIf mode enabled: skipping prompt and push"
 }

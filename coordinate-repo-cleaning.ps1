@@ -1,3 +1,5 @@
+Set-StrictMode -Version Latest
+
 param (
     [ValidateNotNullOrEmpty()]
     [string]$RepoFolder,  # Path to the repository folder
@@ -12,11 +14,23 @@ param (
 
     [switch]$UploadLFS,  # Upload quarantined LFS files to GCS
 
-    [switch]$WhatIf     # If specified, show actions without executing
+[switch]$WhatIf     # If specified, show actions without executing
 )
 
 # Load project-specific configuration
-Import-Module (Join-Path $PSScriptRoot 'lfsavoider.config.ps1')
+. (Join-Path $PSScriptRoot 'lfsavoider.config.ps1')
+
+$LogPath = Join-Path $RepoFolder "cleanup-$((Get-Date).ToString('yyyyMMddHHmmss')).log"
+Start-Transcript -Path $LogPath | Out-Null
+
+function Assert-Config {
+    if (-not $TargetFolders) { Write-Warning 'TargetFolders is empty' }
+    if (-not $PathsToPurge) { Write-Warning 'PathsToPurge is empty' }
+}
+
+Assert-Config
+
+. (Join-Path $PSScriptRoot 'preflight.ps1')
   
 foreach ($repoURL in $RepoURLs) {
     if (-not $repoURL) {
@@ -51,9 +65,16 @@ foreach ($repoURL in $RepoURLs) {
         exit 1
     }
 
+    .\backup-repo.ps1 -RepoPath $BasePath -RemoteURL $repoURL -WhatIf:$WhatIf
+
     # Step 1: Prepare repository
     Write-Host "Preparing repository: $RepoName"
-    .\prepare-speaktome.ps1 -repoURL $repoURL -targetPath $TempPath
+    try {
+        .\prepare-speaktome.ps1 -repoURL $repoURL -targetPath $TempPath -WhatIf:$WhatIf
+    } catch {
+        Write-Error "Prepare failed for $repoURL: $_"
+        continue
+    }
 
     # Step 2: Quarantine LFS data and additional folders
     Write-Host "Quarantining LFS data and additional folders for: $RepoName"
@@ -61,7 +82,7 @@ foreach ($repoURL in $RepoURLs) {
 
     # Step 3: Purge LFS history
     Write-Host "Purging LFS history for: $RepoName"
-    .\purge-lfs-history.ps1 -RepoPath $TempPath -PathsToPurge $PathsToPurge
+    .\purge-lfs-history.ps1 -RepoPath $TempPath -PathsToPurge $PathsToPurge -WhatIf:$WhatIf
 
     # Step 4: Reinstall clean repository
     Write-Host "Reinstalling clean repository for: $RepoName"
@@ -86,3 +107,5 @@ foreach ($repoURL in $RepoURLs) {
 
     Write-Host "Process completed for: $RepoName"
 }
+
+Stop-Transcript | Out-Null

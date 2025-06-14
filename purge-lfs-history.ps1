@@ -1,14 +1,21 @@
 param (
     [ValidateNotNullOrEmpty()]
-    [string]$RepoPath,  # Path to the repository
+    [string]$RepoPath,
 
     [ValidateNotNullOrEmpty()]
-    [string[]]$PathsToPurge  # List of paths to purge
+    [string[]]$PathsToPurge,
+
+    [switch]$WhatIf
 )
 
 Set-Location $RepoPath
 
-pip install git-filter-repo
+if (-not (Get-Command git-filter-repo -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing git-filter-repo" -ForegroundColor Yellow
+    if (-not $WhatIf) { pip install git-filter-repo | Out-Null }
+} else {
+    Write-Host "git-filter-repo already installed"
+}
 
 # Write a path-list file for cleaner usage
 $PathListFile = "paths-to-purge.txt"
@@ -20,10 +27,14 @@ if ($PathsToPurge.Count -eq 0) {
     exit 0
 }
 
-$PathsToPurge -join "`n" | Out-File -Encoding ascii $PathListFile
+$PathsToPurge -join "`n" | Out-File -Encoding utf8 $PathListFile
 
 # Run the filter
-git filter-repo --paths-from-file $PathListFile --invert-paths --force
+if ($WhatIf) {
+    Write-Host "[WhatIf] Would run git filter-repo with $PathListFile"
+} else {
+    git filter-repo --paths-from-file $PathListFile --invert-paths --force
+}
 
-Remove-Item $PathListFile
+if ($WhatIf) { Write-Host "[WhatIf] Would remove $PathListFile" } else { Remove-Item $PathListFile }
 Write-Host "LFS-related history purged."
