@@ -28,5 +28,6 @@ hook_dir="$target/.git/hooks"
 mkdir -p "$hook_dir"
 script_dir="$(dirname "$0")"
 cp "$script_dir/pre-commit.lfs.guard" "$hook_dir/pre-commit"
+
 chmod +x "$hook_dir/pre-commit"
 

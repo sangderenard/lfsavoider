@@ -21,5 +21,6 @@ if (-not (Test-Path $hookDir)) { New-Item -ItemType Directory -Path $hookDir | O
 $preCommit = Join-Path $hookDir "pre-commit"
 $sourceHook = Join-Path $PSScriptRoot "pre-commit.lfs.guard"
 Copy-Item $sourceHook $preCommit -Force
+
 try { icacls $preCommit /grant Everyone:RX > $null } catch {}
 

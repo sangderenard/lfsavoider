@@ -38,3 +38,4 @@ Check each script for usage details. The repository intentionally omits persiste
 ## LFS Guard
 
 All scripts now place a `.lfs.guard` file and a pre-commit hook into generated repositories and manifest folders. The hook script used is provided as `pre-commit.lfs.guard` in this repository. The guard includes a SHA-256 hash of the current manifest so clones can verify integrity and will block any attempt to commit any form of Git LFS usage.
+
