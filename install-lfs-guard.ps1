@@ -20,7 +20,17 @@ $hookDir = Join-Path $TargetPath ".git/hooks"
 if (-not (Test-Path $hookDir)) { New-Item -ItemType Directory -Path $hookDir | Out-Null }
 $preCommit = Join-Path $hookDir "pre-commit"
 $sourceHook = Join-Path $PSScriptRoot "pre-commit.lfs.guard"
-Copy-Item $sourceHook $preCommit -Force
+    Copy-Item $sourceHook $preCommit -Force
 
-try { icacls $preCommit /grant Everyone:RX > $null } catch {}
+    try { icacls $preCommit /grant Everyone:RX > $null } catch {}
+
+    # Lock the pre-commit hook to prevent modification
+    Set-ItemProperty -Path $preCommit -Name IsReadOnly -Value $true
+
+    # Ensure .gitattributes exists and is read-only to discourage LFS usage
+    $gitAttr = Join-Path $TargetPath '.gitattributes'
+    if (-not (Test-Path $gitAttr)) {
+        New-Item -ItemType File -Path $gitAttr | Out-Null
+    }
+    Set-ItemProperty -Path $gitAttr -Name IsReadOnly -Value $true
 
