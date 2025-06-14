@@ -1,0 +1,4 @@
+# Don't commit service account credentials
+gcs-keys/
+*.json
+*.key
