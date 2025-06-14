@@ -15,9 +15,9 @@ if (-not (Test-Path $GCloudKeyPath)) {
 
 $env:GOOGLE_APPLICATION_CREDENTIALS = $GCloudKeyPath
 
-if (-not (Test-Path $QuarantinePath)) {
-    Write-Warning "Quarantine path not found: $QuarantinePath"
-    exit 0
+if (-not (Get-Command gsutil -ErrorAction SilentlyContinue)) {
+    Write-Error "gsutil not found in PATH"
+    exit 1
 }
 
 if (-not (Test-Path $QuarantinePath)) {
@@ -29,7 +29,7 @@ Get-ChildItem -Recurse -Path $QuarantinePath -Include $IncludeExtensions | ForEa
     $RelativePath = $_.FullName.Substring($QuarantinePath.Length).TrimStart('\')
     $GcsPath = "$GCSBucket/$RelativePath".Replace('\\', '/')
     Write-Host "Uploading $($_.Name) to $GcsPath"
-    Invoke-CheckedCommand -WhatIf:$WhatIf -Command { gsutil cp $_.FullName $GcsPath }
+    Invoke-CheckedCommand -WhatIf:$WhatIf -Command { gsutil cp -- "$_.FullName" "$GcsPath" }
 }
 
 $skipped = Get-ChildItem -Recurse -Path $QuarantinePath | Where-Object { $_.Extension -notin $IncludeExtensions }

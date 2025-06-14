@@ -12,13 +12,18 @@ fi
 
 export GOOGLE_APPLICATION_CREDENTIALS="$gcloud_key_path"
 
+if ! command -v gsutil >/dev/null 2>&1; then
+  echo "gsutil not found in PATH" >&2
+  exit 1
+fi
+
 if [ ! -d "$quarantine_path" ]; then
   echo "Quarantine path not found: $quarantine_path"
   exit 0
 fi
 
 find "$quarantine_path" -type f -name '*.whl' | while read -r file; do
-  rel="${file#$quarantine_path/}"
+  rel="${file#"$quarantine_path"/}"
   gcs_path="$gcs_bucket/$rel"
   echo "Uploading $file to $gcs_path"
   gsutil cp "$file" "$gcs_path"
