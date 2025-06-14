@@ -2,6 +2,8 @@
 
 This project provides tools to permanently remove Git LFS usage from a repository. The goal is to quarantine any large binary content, purge all Git LFS metadata, rebuild a clean repository without the LFS hooks, and upload the large binaries to Google Cloud Storage (GCS) for archival. **Never enable Git LFS** in any workflow when using these scripts.
 
+For detailed usage, see [docs/operator_manual.md](docs/operator_manual.md).
+
 ## Overview
 
 PowerShell scripts originally orchestrate the process. This repository now includes a Bash suite that mirrors those scripts. Use whichever toolchain fits your environment but ensure Git LFS is disabled at all times.
