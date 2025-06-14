@@ -79,3 +79,4 @@ if (Test-Path $TemplatePath) {
 }
 
 Write-Host "Manifest files generated for $RepoName in $ManifestPath"
+& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $ManifestPath -ManifestYaml $ManifestYaml

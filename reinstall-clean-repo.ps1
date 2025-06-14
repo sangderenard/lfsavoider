@@ -18,6 +18,9 @@ Set-Location $CleanPath
 git config --local filter.lfs.smudge ""
 git config --local filter.lfs.required false
 
+# Place guard file and pre-commit hook
+& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $CleanPath
+
 # Emergency manual hold
 Write-Host "`nEMERGENCY MODE: Review the repo state before overwriting remote."
 Write-Host "Press Enter to continue with FORCE PUSH or Ctrl+C to cancel."

@@ -59,3 +59,6 @@ if [ -f "$template_path" ]; then
 else
   echo "No HTML template found at $template_path"
 fi
+
+# Place LFS guard and hook in manifest directory
+"$(dirname "$0")"/install-lfs-guard.sh "$manifest_path" "$manifest_yaml"

@@ -13,6 +13,9 @@ cd "$clean_path"
 git config --local filter.lfs.smudge ""
 git config --local filter.lfs.required false
 
+# Insert LFS guard and hook
+"$(dirname "$0")"/install-lfs-guard.sh "$clean_path"
+
 echo -e "\nEMERGENCY MODE: Review the repo state before overwriting remote."
 read -p "Press Enter to continue with FORCE PUSH or Ctrl+C to cancel" _
 
