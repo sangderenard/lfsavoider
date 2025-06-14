@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load project-specific configuration
+source "$(dirname "$0")/lfsavoider.config.sh"
+
 repo_folder=""
 repo_name=""
 repo_urls=()
-additional_folders=()
-additional_dest=""
 quarantine_path=""
 new_flag=false
 upload_lfs=false
@@ -15,8 +16,6 @@ while [[ $# -gt 0 ]]; do
     -r|--repo-folder) repo_folder="$2"; shift 2;;
     -n|--repo-name) repo_name="$2"; shift 2;;
     -u|--repo-url) repo_urls+=("$2"); shift 2;;
-    -a|--additional-folder) additional_folders+=("$2"); shift 2;;
-    --additional-dest) additional_dest="$2"; shift 2;;
     --quarantine) quarantine_path="$2"; shift 2;;
     --new) new_flag=true; shift;;
     --upload-lfs) upload_lfs=true; shift;;
@@ -44,8 +43,9 @@ for repo_url in "${repo_urls[@]}"; do
   temp_path="$base_path-temp"
   clean_path="$base_path-clean"
   quarantine="${quarantine_path:-$base_path-quarantined-lfs}"
-  additional_capture="${additional_dest:-$base_path-additional-capture}"
   backup_git="$base_path-backup-git"
+  # Directory for non-LFS files or additional capture
+  additional_capture="$base_path-additional-capture"
 
   if [ ! -d "$base_path" ]; then
     if [ ! -d "$repo_folder" ]; then
@@ -59,11 +59,20 @@ for repo_url in "${repo_urls[@]}"; do
   echo "Preparing repository: $repo_name"
   ./prepare-speaktome.sh "$repo_url" "$temp_path"
 
+  # Check for broken LFS pointers
+  if ! ./check-lfs-integrity.sh; then
+    echo "Broken LFS pointers detected, removing pointer files"
+    find "$temp_path" -type f -exec grep -Il "version https://git-lfs.github.com/spec/v1" {} \; | while read -r f; do
+      echo "Deleting pointer file $f"
+      rm -f "$f"
+    done
+  fi
+
   echo "Quarantining LFS data and additional folders for: $repo_name"
-  ./quarantine-lfs-data.sh "$quarantine" "$additional_capture" AGENTS/proposals/wheelhouse_repo "${additional_folders[@]}"
+  ./quarantine-lfs-data.sh "$quarantine" "$additional_capture" "${TARGET_FOLDERS[@]:-}"
 
   echo "Purging LFS history for: $repo_name"
-  ./purge-lfs-history.sh "$temp_path" AGENTS/proposals/wheelhouse_repo
+  ./purge-lfs-history.sh "$temp_path" "${PATHS_TO_PURGE[@]:-}"
 
   echo "Reinstalling clean repository for: $repo_name"
   ./reinstall-clean-repo.sh "$temp_path" "$clean_path" "$repo_url"
@@ -79,7 +88,8 @@ for repo_url in "${repo_urls[@]}"; do
 
   if [ "$upload_lfs" = true ] && [ -d "$quarantine" ]; then
     echo "Uploading quarantined LFS files to GCS for: $repo_name"
-    ./upload-lfs-to-gcs.sh "$quarantine" "gs://your-lfs-bucket" "gcs-keys/service-account.json"
+    # Use configured GCS settings
+    ./upload-lfs-to-gcs.sh "$quarantine" "$GCS_BUCKET" "$GCS_KEY_PATH"
   fi
 
   echo "Process completed for: $repo_name"

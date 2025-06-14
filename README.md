@@ -2,11 +2,22 @@
 
 A cross-platform toolkit for permanently removing Git LFS usage from a repository. Each script focuses on a single step: quarantine large binaries, purge history, rebuild without LFS hooks, and optionally archive artifacts to Google Cloud Storage (GCS). **Never re-enable Git LFS in repositories processed with these tools.**
 
+For detailed usage, see [docs/operator_manual.md](docs/operator_manual.md).
+
 ## Overview
 
 The repository contains both PowerShell and Bash implementations. Use whichever environment fits your needs. Scripts assume they are run in disposable clones, never directly on your primary repo.
 
-### Security
+## Configuration
+
+All bash orchestrations load `lfsavoider.config.sh` for project-specific settings. Customize the following variables in that file:
+
+- `WHEELHOUSE_SRC` (optional): path to a local wheelhouse directory.
+- `TARGET_FOLDERS` (optional): array of folder paths (relative to repo root) to quarantine.
+- `PATHS_TO_PURGE` (optional): array of paths (relative to repo root) to remove from commit history.
+- `GCS_BUCKET` and `GCS_KEY_PATH` (optional): Google Cloud Storage settings for uploading artifacts.
+
+### Security and Configuration
 
 - Provide GCS credentials and any secrets through your CI runner or environment, not in this repository.
 - Upload quarantined archives to GCS and keep them out of version control.

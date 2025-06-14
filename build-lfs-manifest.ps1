@@ -1,7 +1,10 @@
 param (
-    [string]$LocalRepoCollectionFolder = "C:\\Apache24\\htdocs\\AI\\local-lfs-archives",
-    [string]$ConfigFile = "config\\manifest.config.json"
+    [string]$RepoRoot = $PWD,
+    [string]$ConfigFile = "config/manifest.config.json",
+    [switch]$WhatIf
 )
+
+. "$PSScriptRoot/helpers.ps1"
 
 # === Load repo name from config ===
 if (-not (Test-Path $ConfigFile)) {
@@ -19,18 +22,23 @@ if (-not $Config.repo_name) {
 $RepoName = $Config.repo_name
 
 # === Build derived paths ===
-$BasePath        = Join-Path $LocalRepoCollectionFolder $RepoName
+$BasePath        = Join-Path $RepoRoot $RepoName
 $QuarantinePath  = Join-Path $BasePath "$RepoName-quarantined-lfs"
 $ManifestPath    = Join-Path $BasePath "$RepoName-manifests"
-$TemplatePath    = Join-Path $BasePath "template\feed.html"  # Optional
+$TemplatePath    = Join-Path $BasePath "template/feed.html"  # Optional
 $ManifestYaml    = Join-Path $ManifestPath "lfs_manifest.yaml"
 $ManifestMD      = Join-Path $ManifestPath "lfs_manifest.md"
 $ManifestHTML    = Join-Path $ManifestPath "index.html"
+$LogFile         = Join-Path $ManifestPath "manifest.log"
+
+if (-not (Test-Path $LogFile)) { New-Item -ItemType File -Path $LogFile | Out-Null }
+"$(Get-Date -Format s) Starting manifest generation" | Add-Content -Path $LogFile
 
 # === Ensure directories exist ===
 @($QuarantinePath, $ManifestPath) | ForEach-Object {
     if (-not (Test-Path $_)) { New-Item -ItemType Directory -Path $_ | Out-Null }
 }
+"$(Get-Date -Format s) Directories ensured" | Add-Content -Path $LogFile
 
 # === Scan quarantined LFS files ===
 $Files = Get-ChildItem -Recurse -Path $QuarantinePath | Where-Object { -not $_.PSIsContainer }
@@ -46,13 +54,14 @@ $YamlData = [ordered]@{
 foreach ($file in $Files) {
     $YamlData.files += [ordered]@{
         name     = $file.Name
-        path     = $file.FullName
+        path     = $file.FullName.Substring($QuarantinePath.Length).TrimStart('\\','/')
         size     = $file.Length
         modified = $file.LastWriteTime
     }
 }
 
 $YamlData | ConvertTo-Yaml | Set-Content -Path $ManifestYaml
+"$(Get-Date -Format s) YAML manifest saved to $ManifestYaml" | Add-Content -Path $LogFile
 
 # === Generate Markdown ===
 $Markdown = @(
@@ -65,18 +74,23 @@ $Markdown += $Files | ForEach-Object {
     "| `$_` | $($_.Length) | $($_.LastWriteTime.ToString('u')) |"
 }
 $Markdown -join "`n" | Set-Content -Path $ManifestMD
+"$(Get-Date -Format s) Markdown manifest saved to $ManifestMD" | Add-Content -Path $LogFile
 
 # === Optional: Generate HTML ===
 if (Test-Path $TemplatePath) {
     $HtmlTemplate = Get-Content -Raw -Path $TemplatePath
     $FileRows = $Files | ForEach-Object {
-        "<tr><td>$($_.Name)</td><td>$($_.FullName)</td><td>$($_.Length)</td><td>$($_.LastWriteTime)</td></tr>"
+        $rel = $_.FullName.Substring($QuarantinePath.Length).TrimStart('\\','/')
+        "<tr><td>$($_.Name)</td><td>$rel</td><td>$($_.Length)</td><td>$($_.LastWriteTime)</td></tr>"
     } | Out-String
     $HtmlFinal = $HtmlTemplate -replace "{{file_rows}}", $FileRows
     $HtmlFinal | Set-Content -Path $ManifestHTML
+    "$(Get-Date -Format s) HTML manifest saved to $ManifestHTML" | Add-Content -Path $LogFile
 } else {
     Write-Warning "No HTML template found at $TemplatePath"
+    "$(Get-Date -Format s) No HTML template found" | Add-Content -Path $LogFile
 }
 
 Write-Host "Manifest files generated for $RepoName in $ManifestPath"
-& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $ManifestPath -ManifestYaml $ManifestYaml
+"$(Get-Date -Format s) Manifest generation complete" | Add-Content -Path $LogFile
+& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $ManifestPath -ManifestYaml $ManifestYaml -WhatIf:$WhatIf

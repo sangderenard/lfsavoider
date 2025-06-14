@@ -1,31 +1,39 @@
 param (
-    [ValidateNotNullOrEmpty()]
-    [string]$CleanPath,  # Path for the clean repository
-
-    [ValidateNotNullOrEmpty()]
-    [string]$RepoPath,  # Path to the temporary repository
-
-    [ValidateNotNullOrEmpty()]
-    [string]$RemoteURL  # Remote URL for the repository
+    [Parameter(Mandatory)][string]$CleanPath,
+    [Parameter(Mandatory)][string]$RepoPath,
+    [Parameter(Mandatory)][string]$RemoteURL,
+    [switch]$AutoConfirm,
+    [switch]$WhatIf
 )
 
-# Clean destination if exists
-if (Test-Path $CleanPath) { Remove-Item -Recurse -Force $CleanPath }
-Copy-Item -Recurse -Force $RepoPath $CleanPath
+. "$PSScriptRoot/helpers.ps1"
 
-Set-Location $CleanPath
-# Ensure Git operates without LFS filters
-git config --local filter.lfs.smudge ""
-git config --local filter.lfs.required false
+# Clean destination if exists
+
+if (Test-Path $CleanPath) {
+    Invoke-CheckedCommand -WhatIf:$WhatIf -Command { Remove-Item -Recurse -Force $CleanPath }
+}
+Invoke-CheckedCommand -WhatIf:$WhatIf -Command { Copy-Item -Recurse -Force $RepoPath $CleanPath }
+
+if (-not $WhatIf) { Set-Location $CleanPath }
+Invoke-CheckedCommand -WhatIf:$WhatIf -Command { git -C $CleanPath config --local filter.lfs.smudge "" }
+Invoke-CheckedCommand -WhatIf:$WhatIf -Command { git -C $CleanPath config --local filter.lfs.required false }
 
 # Place guard file and pre-commit hook
-& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $CleanPath
+& "$(Join-Path $PSScriptRoot 'install-lfs-guard.ps1')" -TargetPath $CleanPath -WhatIf:$WhatIf
 
-# Emergency manual hold
-Write-Host "`nEMERGENCY MODE: Review the repo state before overwriting remote."
-Write-Host "Press Enter to continue with FORCE PUSH or Ctrl+C to cancel."
-Read-Host
+if (-not $AutoConfirm -and -not $WhatIf) {
+    Write-Host "`nReview repo state before overwriting remote." -ForegroundColor Yellow
+    Read-Host "Press Enter to continue or Ctrl+C to cancel"
+} else {
+    Write-Host "AutoConfirm or WhatIf enabled: skipping prompt"
+}
 
 # Force push to clean overwrite the repo (use carefully)
-git remote set-url origin $RemoteURL
-git push --force --set-upstream origin main
+if (-not $WhatIf) {
+    Invoke-CheckedCommand -Command { git remote set-url origin $RemoteURL }
+    Invoke-CheckedCommand -Command { git push --force --set-upstream origin main }
+} else {
+    Write-Host "WhatIf: git remote set-url origin $RemoteURL"
+    Write-Host "WhatIf: git push --force --set-upstream origin main"
+}

@@ -1,24 +1,21 @@
 param (
-    [ValidateNotNullOrEmpty()]
-    [string]$RepoFolder,  # Path to the repository folder
-
-    [ValidateNotNullOrEmpty()]
-    [string]$RepoName,  # Name of the repository
-
-    [ValidateNotNullOrEmpty()]
-    [string[]]$RepoURLs,  # List of repository URLs
-
-    [string[]]$AdditionalFolders = @(),  # Additional folders to copy or excise
-
-    [string]$AdditionalFolderDestination = "",  # Destination for additional folders
-
-    [string]$QuarantinePath = "",  # Path for quarantined LFS data
-
-    [switch]$New,  # Replace old folders if the process completes successfully
-
-    [switch]$UploadLFS  # Upload quarantined LFS files to GCS
+    [Parameter(Mandatory)][string]$RepoFolder,
+    [string]$RepoName,
+    [string[]]$RepoURLs,
+    [switch]$New,
+    [switch]$UploadLFS,
+    [switch]$BackupRemote,
+    [string]$BackupDir = (Join-Path $PSScriptRoot 'backups'),
+    [switch]$WhatIf
 )
 
+. "$PSScriptRoot/helpers.ps1"
+. (Join-Path $PSScriptRoot 'lfsavoider.config.ps1') | Out-Null
+$config = @{ TargetFolders = $TargetFolders; PathsToPurge = $PathsToPurge; WheelhouseSrc = $WheelhouseSrc; GCSBucket = $GCSBucket; GCSKeyPath = $GCSKeyPath }
+Assert-Config -Config $config
+
+Start-CleanupLog -LogDir $BackupDir
+  
 foreach ($repoURL in $RepoURLs) {
     if (-not $repoURL) {
         if (-not $RepoName) {
@@ -38,8 +35,9 @@ foreach ($repoURL in $RepoURLs) {
     $BasePath = Join-Path $RepoFolder $RepoName
     $TempPath = "$BasePath-temp"
     $CleanPath = "$BasePath-clean"
-    $QuarantinePath = if ($QuarantinePath) { $QuarantinePath } else { "$BasePath-quarantined-lfs" }
-    $AdditionalCapturePath = if ($AdditionalFolderDestination) { $AdditionalFolderDestination } else { "$BasePath-additional-capture" }
+    # Define paths for quarantine and additional capture
+    $QuarantinePath = "$BasePath-quarantined-lfs"
+    $AdditionalCapturePath = "$BasePath-additional-capture"
     $BackupGitPath = "$BasePath-backup-git"
 
     if (-not (Test-Path $BasePath)) {
@@ -51,38 +49,44 @@ foreach ($repoURL in $RepoURLs) {
         exit 1
     }
 
+    # Step 0: Backup repository
+    Write-Host "Backing up $RepoName" -ForegroundColor Cyan
+    .\backup-repo.ps1 -RepoPath $BasePath -BackupDir $BackupDir -IncludeRemote:$BackupRemote -WhatIf:$WhatIf
+
     # Step 1: Prepare repository
     Write-Host "Preparing repository: $RepoName"
-    .\prepare-speaktome.ps1 -repoURL $repoURL -targetPath $TempPath
+    .\prepare-speaktome.ps1 -RepoURL $repoURL -TargetPath $TempPath -WhatIf:$WhatIf
 
     # Step 2: Quarantine LFS data and additional folders
     Write-Host "Quarantining LFS data and additional folders for: $RepoName"
-    .\quarantine-lfs-data.ps1 -TargetFolders @("AGENTS\proposals\wheelhouse_repo") + $AdditionalFolders -AdditionalFolderDestination $AdditionalCapturePath -QuarantinePath $QuarantinePath
+    .\quarantine-lfs-data.ps1 -QuarantinePath $QuarantinePath -AdditionalFolderDestination $AdditionalCapturePath -TargetFolders $TargetFolders -WhatIf:$WhatIf
 
     # Step 3: Purge LFS history
     Write-Host "Purging LFS history for: $RepoName"
-    .\purge-lfs-history.ps1 -RepoPath $TempPath -PathsToPurge @("AGENTS/proposals/wheelhouse_repo")
+    .\purge-lfs-history.ps1 -RepoPath $TempPath -PathsToPurge $PathsToPurge -WhatIf:$WhatIf
 
     # Step 4: Reinstall clean repository
     Write-Host "Reinstalling clean repository for: $RepoName"
-    .\reinstall-clean-repo.ps1 -repoPath $TempPath -cleanPath $CleanPath
+    .\reinstall-clean-repo.ps1 -RepoPath $TempPath -CleanPath $CleanPath -RemoteURL $repoURL -WhatIf:$WhatIf
 
     # Step 5: Restore Git metadata (optional)
     Write-Host "Restoring Git metadata for: $RepoName"
-    .\restore-git-metadata.ps1 -repoPath $CleanPath
+    .\restore-git-metadata.ps1 -RepoPath $CleanPath -BackupGit $BackupGitPath -WhatIf:$WhatIf
 
     # Step 6: Replace old folder if -New is specified
     if ($New) {
         Write-Host "Replacing old folder with new clean repository for: $RepoName"
-        if (Test-Path $BasePath) { Remove-Item -Recurse -Force $basePath }
-        Rename-Item -Path $cleanPath -NewName $basePath
+        if (Test-Path $BasePath) { Remove-Item -Recurse -Force -WhatIf:$WhatIf $basePath }
+        Rename-Item -Path $cleanPath -NewName $basePath -WhatIf:$WhatIf
     }
 
     # Step 7: Upload quarantined LFS files to GCS if -UploadLFS is specified
     if ($UploadLFS -and (Test-Path $QuarantinePath)) {
         Write-Host "Uploading quarantined LFS files to GCS for: $RepoName"
-        .\upload-lfs-to-gcs.ps1 -QuarantinePath $QuarantinePath -GCSBucket "gs://your-lfs-bucket" -GCloudKeyPath "gcs-keys/service-account.json"
+        .\upload-lfs-to-gcs.ps1 -QuarantinePath $QuarantinePath -GCSBucket $GCSBucket -GCloudKeyPath $GCSKeyPath -WhatIf:$WhatIf
     }
 
     Write-Host "Process completed for: $RepoName"
 }
+
+Stop-CleanupLog
