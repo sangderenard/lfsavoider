@@ -26,12 +26,8 @@ EOF2
 
 hook_dir="$target/.git/hooks"
 mkdir -p "$hook_dir"
-cat > "$hook_dir/pre-commit" <<'HOOK'
-#!/usr/bin/env bash
-if git lfs ls-files | grep -q .; then
-  echo "❌ LFS usage is prohibited in this repo."
-  exit 1
-fi
-HOOK
+script_dir="$(dirname "$0")"
+cp "$script_dir/pre-commit.lfs.guard" "$hook_dir/pre-commit"
+
 chmod +x "$hook_dir/pre-commit"
 

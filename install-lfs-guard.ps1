@@ -19,13 +19,8 @@ $guardFile = Join-Path $TargetPath ".lfs.guard"
 $hookDir = Join-Path $TargetPath ".git/hooks"
 if (-not (Test-Path $hookDir)) { New-Item -ItemType Directory -Path $hookDir | Out-Null }
 $preCommit = Join-Path $hookDir "pre-commit"
-$hookContent = @'
-#!/usr/bin/env bash
-if git lfs ls-files | grep -q .; then
-  echo "❌ LFS usage is prohibited in this repo."
-  exit 1
-fi
-'@
-$hookContent | Set-Content -Path $preCommit -NoNewline
+$sourceHook = Join-Path $PSScriptRoot "pre-commit.lfs.guard"
+Copy-Item $sourceHook $preCommit -Force
+
 try { icacls $preCommit /grant Everyone:RX > $null } catch {}
 
